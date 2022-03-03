@@ -1,5 +1,6 @@
 library(dplyr)
 library(ggplot2)
+library(ggpubr)
 library(parallel)
 library(readxl)
 library(svglite)
@@ -184,6 +185,61 @@ for (s in names(figs)) {
   dev.off()
 }
 rm(s)
+
+# Correlations
+periods <- c("FU_end", "PO", "6M", "1Y", "3Y")
+corL <- unlist(recursive = FALSE, mclapply(periods, function(p) {
+  X <- c("ALMI", "LMI", "LMTot", "FMI", "TWL", "Albumine")
+  if (p == "PO") X <- X[X != "TWL"]
+  lapply(X, function(x) {
+    y <- "preAlb"
+    d <- na.omit(lg[lg$period == p, c(x, y)])
+    delta <- qnorm(0.975) / sqrt(nrow(d) - 3)
+    cor_pearson <- cor(d[[x]], d[[y]])
+    cor_pearson_lwr <- tanh(atanh(cor_pearson) - delta)
+    cor_pearson_upr <- tanh(atanh(cor_pearson) + delta)
+    cor_pearson_pv <- cor.test(d[[x]], d[[y]])$p.value
+    cor_spearman <- cor(d[[x]], d[[y]], method = "spearman")
+    cor_spearman_lwr <- tanh(atanh(cor_spearman) - delta)
+    cor_spearman_upr <- tanh(atanh(cor_spearman) + delta)
+    cor_spearman_pv <- cor.test(d[[x]], d[[y]], method = "spearman",
+                                exact = FALSE)$p.value
+    tbl_row <- data.frame(
+      period = p,
+      variable1 = x,
+      variable2 = y,
+      nobs = nrow(d),
+      cor_pearson = cor_pearson,
+      cor_pearson_lwr = cor_pearson_lwr,
+      cor_pearson_upr = cor_pearson_upr,
+      cor_pearson_pv = cor_pearson_pv,
+      cor_spearman = cor_spearman,
+      cor_spearman_lwr = cor_spearman_lwr,
+      cor_spearman_upr = cor_spearman_upr,
+      cor_spearman_pv = cor_spearman_pv
+    )
+    fig <- ggscatter(d, x, y, add = "reg.line") +
+      stat_cor() +
+      labs(title = p)
+  fig_filename <- paste0(paste(p, "cor", x, y, sep = "_"), ".svg")
+    list(tbl_row = tbl_row, fig = fig, fig_filename = fig_filename)
+  })
+}))
+rm(periods)
+
+# Correlations - Table
+cor_tbl <- do.call(rbind, lapply(corL, function(z) z$tbl_row))
+write_xlsx(cor_tbl, file.path(outdir, "correlations.xlsx"))
+
+# Correlations - Figures
+o <- file.path(outdir, "correlations")
+if (!dir.exists(o)) dir.create(o)
+for (z in corL) {
+  svglite(file.path(o, z$fig_filename))
+  print(z$fig)
+  dev.off()
+}
+rm(o, z)
 
 # Session Info
 sink(file.path(outdir, "sessionInfo.txt"))
