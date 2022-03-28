@@ -1,8 +1,10 @@
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
+library(officer)
 library(parallel)
 library(readxl)
+library(rvg)
 library(svglite)
 library(tidyr)
 library(writexl)
@@ -33,6 +35,7 @@ dta <- mclapply(dta, function(d) {
   d <- d[sapply(d, function(x) any(!is.na(x)))]
   # Convert character variables which contain numeric values to numeric
   for (j in which(!grepl("CRP$", names(d)))) {
+outdir <- "results/analyses_dev"
     x <- d[[j]]
     if (all(is.na(x) | grepl("^(-)?[0-9]+(\\.[0-9]+)?$", x))) {
       d[[j]] <- as.numeric(x)
@@ -61,6 +64,11 @@ lg2 <- dta[[2]] %>%
     `3Y_Masse_totale_perdue` = `Masse totale perdue 3Y`,
     `3Y_Masse_maigre_perdue` = `Masse maigre perdue 3Y`,
     `3Y_Masse_maigre_perdue_pct` = `Masse maigre perdue % Y3`
+  ) %>%
+  mutate(
+    `6M_ΔpreAlb` = `6M_preAlb` - PO_preAlb,
+    `1Y_ΔpreAlb` = `1Y_preAlb` - PO_preAlb,
+    `3Y_ΔpreAlb` = `3Y_preAlb` - PO_preAlb
   ) %>%
   rename_with(~ sub("^(PO|6M|1Y|3Y)(_)(.+)", "\\1__\\3", .x)) %>%
   pivot_longer(
@@ -187,45 +195,62 @@ for (s in names(figs)) {
 rm(s)
 
 # Correlations
-periods <- c("FU_end", "PO", "6M", "1Y", "3Y")
-corL <- unlist(recursive = FALSE, mclapply(periods, function(p) {
-  X <- c("ALMI", "LMI", "LMTot", "FMI", "TWL", "Albumine")
-  if (p == "PO") X <- X[X != "TWL"]
-  lapply(X, function(x) {
-    y <- "preAlb"
-    d <- na.omit(lg[lg$period == p, c(x, y)])
-    delta <- qnorm(0.975) / sqrt(nrow(d) - 3)
-    cor_pearson <- cor(d[[x]], d[[y]])
-    cor_pearson_lwr <- tanh(atanh(cor_pearson) - delta)
-    cor_pearson_upr <- tanh(atanh(cor_pearson) + delta)
-    cor_pearson_pv <- cor.test(d[[x]], d[[y]])$p.value
-    cor_spearman <- cor(d[[x]], d[[y]], method = "spearman")
-    cor_spearman_lwr <- tanh(atanh(cor_spearman) - delta)
-    cor_spearman_upr <- tanh(atanh(cor_spearman) + delta)
-    cor_spearman_pv <- cor.test(d[[x]], d[[y]], method = "spearman",
-                                exact = FALSE)$p.value
-    tbl_row <- data.frame(
-      period = p,
-      variable1 = x,
-      variable2 = y,
-      nobs = nrow(d),
-      cor_pearson = cor_pearson,
-      cor_pearson_lwr = cor_pearson_lwr,
-      cor_pearson_upr = cor_pearson_upr,
-      cor_pearson_pv = cor_pearson_pv,
-      cor_spearman = cor_spearman,
-      cor_spearman_lwr = cor_spearman_lwr,
-      cor_spearman_upr = cor_spearman_upr,
-      cor_spearman_pv = cor_spearman_pv
-    )
-    fig <- ggscatter(d, x, y, add = "reg.line") +
-      stat_cor() +
-      labs(title = p)
-  fig_filename <- paste0(paste(p, "cor", x, y, sep = "_"), ".svg")
-    list(tbl_row = tbl_row, fig = fig, fig_filename = fig_filename)
-  })
+Y <- c("preAlb", "ΔpreAlb", "Albumine")
+corL <- unlist(recursive = FALSE, mclapply(Y, function(y) {
+  if (y == "preAlb") {
+    periods <- c("FU_end", "PO", "6M", "1Y", "3Y")
+    X <- c("ALMI", "LMI", "LMTot", "FMI", "TWL", "Albumine")
+  } else if (y == "ΔpreAlb") {
+    periods <- c("6M", "1Y")
+    X <- "Masse_maigre_perdue_pct"
+  } else {
+    periods <- c("FU_end", "PO", "6M", "1Y", "3Y")
+    X <- c("ALMI", "LMI", "LMTot", "FMI", "TWL")
+  }
+  unlist(recursive = FALSE, lapply(periods, function(p) {
+    if (p == "PO") X <- X[X != "TWL"]
+    lapply(X, function(x) {
+      d <- na.omit(lg[lg$period == p, c(x, y)])
+      delta <- qnorm(0.975) / sqrt(nrow(d) - 3)
+      cor_pearson <- cor(d[[x]], d[[y]])
+      cor_pearson_lwr <- tanh(atanh(cor_pearson) - delta)
+      cor_pearson_upr <- tanh(atanh(cor_pearson) + delta)
+      cor_pearson_pv <- cor.test(d[[x]], d[[y]])$p.value
+      cor_spearman <- cor(d[[x]], d[[y]], method = "spearman")
+      cor_spearman_lwr <- tanh(atanh(cor_spearman) - delta)
+      cor_spearman_upr <- tanh(atanh(cor_spearman) + delta)
+      cor_spearman_pv <- cor.test(d[[x]], d[[y]], method = "spearman",
+                                  exact = FALSE)$p.value
+      tbl_row <- data.frame(
+        period = p,
+        variable1 = x,
+        variable2 = y,
+        nobs = nrow(d),
+        cor_pearson = cor_pearson,
+        cor_pearson_lwr = cor_pearson_lwr,
+        cor_pearson_upr = cor_pearson_upr,
+        cor_pearson_pv = cor_pearson_pv,
+        cor_spearman = cor_spearman,
+        cor_spearman_lwr = cor_spearman_lwr,
+        cor_spearman_upr = cor_spearman_upr,
+        cor_spearman_pv = cor_spearman_pv
+      )
+      a <- paste0("R = ", signif(cor_pearson, 2), ", p = ",
+                  signif(cor_pearson_pv, 2))
+      fig <- ggplot(d, aes_string(x = x, y = y)) +
+        geom_point() +
+        geom_smooth(method = lm, se = FALSE, formula = y ~ x,
+                    color = "black") +
+        annotate("text", x = -Inf, y = Inf, hjust = -.2, vjust = 5,
+                 label = a) +
+        theme_pubr()
+
+    fig_filename <- paste0(paste(p, "cor", x, y, sep = "_"), ".svg")
+      list(tbl_row = tbl_row, fig = fig, fig_filename = fig_filename)
+    })
+  }))
 }))
-rm(periods)
+rm(Y)
 
 # Correlations - Table
 cor_tbl <- do.call(rbind, lapply(corL, function(z) z$tbl_row))
@@ -235,11 +260,14 @@ write_xlsx(cor_tbl, file.path(outdir, "correlations.xlsx"))
 o <- file.path(outdir, "correlations")
 if (!dir.exists(o)) dir.create(o)
 for (z in corL) {
-  svglite(file.path(o, z$fig_filename))
-  print(z$fig)
-  dev.off()
+  ggsave(file.path(o, z$fig_filename), z$fig)
+  doc <- read_pptx()
+  doc <- add_slide(doc, 'Title and Content', 'Office Theme')
+  anyplot <- dml(ggobj = z$fig)
+  doc <- ph_with(doc, anyplot, location = ph_location_fullsize())
+  print(doc, target = file.path(o, sub("svg$", "pptx", z$fig_filename)))
 }
-rm(o, z)
+rm(o, z, doc, anyplot)
 
 # Session Info
 sink(file.path(outdir, "sessionInfo.txt"))
