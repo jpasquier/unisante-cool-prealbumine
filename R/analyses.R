@@ -9,7 +9,11 @@ library(svglite)
 library(tidyr)
 library(writexl)
 
-options(mc.cores = detectCores() - 1) 
+# Set options
+options(mc.cores = detectCores() - 1)
+
+# Conflict between officer and readxl
+read_xlsx = readxl::read_xlsx
 
 # Working directory
 setwd("~/Projects/Consultations/Favre Lucie (COOL-Prealbumine)")
@@ -19,23 +23,22 @@ outdir <- paste0("results/analyses_", format(Sys.Date(), "%Y%m%d"))
 if (!dir.exists(outdir)) dir.create(outdir)
 
 # Import data
-f <- c("data-raw/COOL CC prealb All DXA + selection creat & prealbumin.xlsx",
-       "data-raw/Timepoints prealb.xlsx")
-dta <- list(read_xlsx(f[1], sheet = "Selection eGFR >30 et CRP <30"),
-            read_xlsx(f[2], sheet = "Selection eGF>30 et CRP <30"))
+f <- c("data-raw/Cross-sectional COOL_CC_366preal pour JP.xlsx",
+       "data-raw/Longitudinal COOL_CC_166prealb_pour JP.xlsx")
+dta <- list(
+  read_xlsx(f[1], sheet = "data"),
+  read_xlsx(f[2], sheet = "data-all-166-po", range = cell_rows(1:167))
+)
 rm(f)
 
 # Data preprocessing
 dta <- mclapply(dta, function(d) {
-  names(d)[names(d) == "Id...1"] <- "Id"
-  d <- d[names(d) != "Id...9"]
   # Remove units
   d <- d[!grepl("unit$", names(d))]
   # Remove empty variables
   d <- d[sapply(d, function(x) any(!is.na(x)))]
   # Convert character variables which contain numeric values to numeric
   for (j in which(!grepl("CRP$", names(d)))) {
-outdir <- "results/analyses_dev"
     x <- d[[j]]
     if (all(is.na(x) | grepl("^(-)?[0-9]+(\\.[0-9]+)?$", x))) {
       d[[j]] <- as.numeric(x)
@@ -73,7 +76,7 @@ lg2 <- dta[[2]] %>%
   rename_with(~ sub("^(PO|6M|1Y|3Y)(_)(.+)", "\\1__\\3", .x)) %>%
   pivot_longer(
     cols = starts_with(c("PO__", "6M__", "1Y__", "3Y__")),
-    names_to = c("period", ".value"), 
+    names_to = c("period", ".value"),
     names_pattern = "(.+)__(.+)"
   ) %>%
   mutate(ΔLM = factor(Masse_maigre_perdue_pct <= 25, c(TRUE, FALSE),
@@ -273,4 +276,3 @@ rm(o, z, doc, anyplot)
 sink(file.path(outdir, "sessionInfo.txt"))
 print(sessionInfo(), locale = FALSE)
 sink()
-
