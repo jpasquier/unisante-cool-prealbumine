@@ -1,0 +1,294 @@
+---
+title: Evolution of the pre-albumin values in the longitudinal dataset
+author: "Jérôme Pasquier"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+format:
+    html:
+        lightbox: true
+        embed-resources: true
+        html-math-method: katex
+---
+
+<!--
+ !   ╭───────╮
+ !   │ Setup │
+ !   ╰───────╯
+-->
+
+```{r}
+#| label: setup
+#| include: false
+
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(here)
+library(knitr)
+library(lme4)
+library(lmerTest)
+library(performance)
+library(svglite)
+library(tidyr)
+library(xfun)
+
+# Set default ggplot theme
+theme_set(theme_bw())
+
+# Working directory
+i_am("R/prealb_evolution.qmd") |> suppressMessages()
+
+# Load preprocessed data
+load(here("data", "dta.rda"))
+
+# Convert the longitudinal data to long format
+lg <- dta$lg %>%
+    rename_with(~ sub("^(PO|6M|1Y|3Y)(_)(.+)", "\\1__\\3", .x)) %>%
+    pivot_longer(
+        cols = matches("^(PO|6M|1Y|3Y)__(.+)"),
+        names_to = c("period", ".value"),
+        names_pattern = "(.+)__(.+)"
+    ) %>%
+    mutate(period = factor(period, levels = c("PO", "6M", "1Y", "3Y")))
+
+# Check that `Subject ID` and `IPP` are equivalent and can be used as unique
+# identifiers
+select(dta$lg, `Subject ID`, `IPP`) |>
+    lapply(\(x) c(any(is.na(x)), any(duplicated(x)))) |>
+    unlist() |> is.na() |> any() |> (\(x) if (x) stop())()
+```
+
+<!--
+ !   ╭──────────────────╮
+ !   │ Download helpers │
+ !   ╰──────────────────╯
+-->
+
+```{r}
+#| label: download-helper
+#| include: false
+
+# Download a table in a CSV file
+dl_tbl <- function(tbl, text = "Download CSV") {
+    tmp_dir <- here(".cache/preAlb_tables")
+    tmp_file <- paste0(deparse(substitute(tbl)), ".csv")
+    tmp_file <- file.path(tmp_dir, tmp_file)
+    if (!dir.exists(tmp_dir)) dir.create(tmp_dir, recursive = TRUE)
+    write.csv(tbl, file = tmp_file, row.names = FALSE)
+    embed_file(tmp_file, text = text)
+}
+
+# Download a figure in a SVG file
+dl_fig <- function(fig, text = "Download SVG") {
+    tmp_dir <- here(".cache/preAlb_figures")
+    tmp_file <- paste0(deparse(substitute(fig)), ".svg")
+    tmp_file <- file.path(tmp_dir, tmp_file)
+    if (!dir.exists(tmp_dir)) dir.create(tmp_dir, recursive = TRUE)
+    svglite(tmp_file)
+    print(fig)
+    dev.off()
+    embed_file(tmp_file, text = text)
+}
+
+```
+
+```{css}
+#| echo: false
+
+.dl-link {
+  float: right;
+  font-size: 0.75em;
+  margin-top: -1.5em;
+}
+```
+
+<!--
+ !   ╭──────────────────╮
+ !   │ Raw Data Summary │
+ !   ╰──────────────────╯
+-->
+
+## Raw Data Summary
+
+@tbl-preAlb-raw-means presents the raw means and confidence intervals for
+pre-albumin values by period and gender, without any statistical modeling.
+
+```{r}
+#| label: tbl-preAlb-raw-means
+#| tbl-cap: Raw pre-albumin means by period and gender
+#| echo: false
+
+# Prealbumin values per period and gender (without any model)
+tbl_raw_means <- lg %>%
+    drop_na(preAlb) %>%
+    group_by(period, Gender) %>%
+    summarise(
+        n = n(),
+        mean = mean(preAlb),
+        SD = sd(preAlb),
+        SE = SD / sqrt(n),
+        lower.CL = mean - qt(0.975, n - 1) * SE,
+        upper.CL = mean + qt(0.975, n - 1) * SE,
+        .groups = "drop"
+    ) %>%
+    rename(Period = period)
+
+kable(tbl_raw_means, digits  = 4)
+```
+
+[`r dl_tbl(tbl_raw_means)`]{.dl-link}
+
+<!--
+ !   ╭────────────────────╮
+ !   │ Statistical models │
+ !   ╰────────────────────╯
+-->
+
+## Statistical Models
+
+Two models were fitted to analyze the pre-albumin data: a fixed-effects model
+and a random-effects model accounting for repeated measures within subjects.
+
+```{r}
+#| label: models
+#| include: false
+
+# Models
+fit_fx <- lm(preAlb ~ Gender * period, data = lg)
+fit_rd <- lmer(preAlb ~ Gender * period+(1 | IPP), data = lg)
+
+# Model Diagnostics
+diag_fx <- check_model(fit_fx)
+diag_rd <- check_model(fit_rd)
+
+# Helper: Table of the estimated marginal means
+tbl_emm <- function(fit) {
+    n <- model.frame(fit) %>%
+        group_by(period, Gender) %>%
+        summarise(n = n(), .groups = "drop")
+    emmeans(fit, ~ Gender * period) %>%
+        as_tibble() %>%
+        select(!df) %>%
+        left_join(n, by = join_by(Gender, period)) %>%
+        rename(Period = period) %>%
+        relocate(Period) %>%
+        relocate(n, .after = Gender)
+}
+
+# Helper: Figure of the estimated marginal means
+plot_emm <- function(fit) {
+    emm <- emmeans(fit, ~ Gender * period)
+    emm_df <- as.data.frame(emm)
+    pd <- position_dodge(width = .35)
+    aes <- aes(x = period, y = emmean, color = Gender, group = Gender)
+    p <- ggplot(emm_df, aes) +
+        geom_line(position = pd, linewidth = .9) +
+        geom_point(position = pd, size = 3) +
+        geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                      width = 0, position = pd, linewidth = .8) +
+        scale_colour_viridis_d(option = "A", begin = .2, end = .8) +
+        labs(x = "Period",
+             y = "Predicted pre-albumin",
+             colour = "Gender") +
+        theme(legend.position = "top")
+    return(p)
+}
+```
+
+### Fixed Effects Model
+
+The fixed effects model treats each observation as independent.
+
+$$
+\text{preAlb} = \beta_0 + \beta_1 \cdot \text{gender} + \beta_2 \cdot
+\text{period} + \beta_3 \cdot (\text{gender} \cdot \text{period}) + \epsilon
+\, , \quad \epsilon \sim \mathcal{N}(0, \sigma^2)
+$$
+
+Estimated marginal means from this model are shown in @tbl-emm-fx and
+@fig-emm-fx.
+
+```{r}
+#| label: tbl-emm-fx
+#| tbl-cap: Estimated marginal means from fixed effects model
+#| echo: false
+
+tbl_emm_fx <- tbl_emm(fit_fx)
+kable(tbl_emm_fx, digits = 4)
+```
+
+[`r dl_tbl(tbl_emm_fx)`]{.dl-link}
+
+
+```{r}
+#| label: fig-emm-fx
+#| fig-cap: Estimated marginal means from fixed effects model
+#| echo: false
+
+fig_emm_fx <- plot_emm(fit_fx)
+print(fig_emm_fx)
+```
+
+[`r dl_fig(fig_emm_fx)`]{.dl-link}
+
+### Random Effects Model
+
+The random effects model accounts for within-subject correlation by including a
+random intercept for each participant.
+
+$$
+\begin{align*}
+& \text{preAlb} = \beta_0 + \beta_1 \cdot \text{gender} + \beta_2 \cdot
+\text{period} + \beta_3 \cdot (\text{gender} \cdot \text{period}) +
+b_{\text{IPP}} + \epsilon \, , \\
+& \epsilon \sim \mathcal{N}(0, \sigma^2) \, ,
+\quad b_{\text{IPP}} \sim \mathcal{N}(0, \tau^2)
+\end{align*}
+$$
+
+Estimated marginal means from this model are shown in @tbl-emm-rd and
+@fig-emm-rd.
+
+```{r}
+#| label: tbl-emm-rd
+#| tbl-cap: Estimated marginal means from random effects model
+#| echo: false
+
+tbl_emm_rd <- tbl_emm(fit_rd)
+kable(tbl_emm_rd, digits = 4)
+```
+
+[`r dl_tbl(tbl_emm_rd)`]{.dl-link}
+
+
+```{r}
+#| label: fig-emm-rd
+#| fig-cap: Estimated marginal means from random effects model
+#| echo: false
+
+fig_emm_rd <- plot_emm(fit_rd)
+print(fig_emm_rd)
+```
+
+[`r dl_fig(fig_emm_rd)`]{.dl-link}
+
+<!--
+ !   ╭────────────╮
+ !   │ Discussion │
+ !   ╰────────────╯
+-->
+
+## Discussion
+
+The results show the evolution of pre-albumin levels across different time
+periods (PO, 6M, 1Y, 3Y) and between genders. The random effects model accounts
+for the longitudinal nature of the data by modeling within-subject correlation,
+which typically provides more appropriate estimates and confidence intervals
+for repeated measures data compared to the fixed effects model.
+
+## Appendix
+
+Models diagnostics:
+
+`r dl_fig(diag_fx, "Dignostics for the fixed effects model")`
+
+`r dl_fig(diag_rd, "Diagnostics for the random effects model")`
