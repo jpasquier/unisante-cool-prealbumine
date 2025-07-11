@@ -1,5 +1,8 @@
 ---
-title: Evolution of the pre-albumin values in the longitudinal dataset
+title: |
+    ![](img/ethz_nexus_logo.svg){width=80%} \
+    \
+    Evolution of the pre-albumin values in the longitudinal dataset
 author: "Jérôme Pasquier"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 format:
@@ -19,17 +22,20 @@ format:
 #| label: setup
 #| include: false
 
-library(dplyr)
-library(emmeans)
-library(ggplot2)
-library(here)
-library(knitr)
-library(lme4)
-library(lmerTest)
-library(performance)
-library(svglite)
-library(tidyr)
-library(xfun)
+{
+    library(dplyr)
+    library(emmeans)
+    library(ggplot2)
+    library(here)
+    library(knitr)
+    library(lme4)
+    library(lmerTest)
+    library(performance)
+    library(svglite)
+    library(tidyr)
+    library(xfun)
+} |>
+    suppressMessages()
 
 # Set default ggplot theme
 theme_set(theme_bw())
@@ -94,6 +100,11 @@ dl_fig <- function(fig, text = "Download SVG") {
 ```{css}
 #| echo: false
 
+.container {
+  display: flex;
+flex-direction: column;
+}
+
 .dl-link {
   float: right;
   font-size: 0.75em;
@@ -111,6 +122,8 @@ dl_fig <- function(fig, text = "Download SVG") {
 
 @tbl-preAlb-raw-means presents the raw means and confidence intervals for
 pre-albumin values by period and gender, without any statistical modeling.
+
+::: {.container}
 
 ```{r}
 #| label: tbl-preAlb-raw-means
@@ -136,6 +149,8 @@ kable(tbl_raw_means, digits  = 4)
 ```
 
 [`r dl_tbl(tbl_raw_means)`]{.dl-link}
+
+:::
 
 <!--
  !   ╭────────────────────╮
@@ -192,6 +207,38 @@ plot_emm <- function(fit) {
         theme(legend.position = "top")
     return(p)
 }
+
+# Helper: Table of gender contrasts
+gender_contrasts <- function(fit) {
+    emm_gender_period <- emmeans(fit, ~ Gender | period)
+    gender_contrasts <- contrast(emm_gender_period, "pairwise",
+                                 adjust = "none")
+    as_tibble(gender_contrasts) %>%
+        mutate(lower.CL = estimate - SE * qt(0.975, df),
+               upper.CL = estimate + SE * qt(0.975, df)) %>%
+        select(contrast, period, estimate, lower.CL, upper.CL, p.value)
+}
+
+# Helper: Table of period contrasts
+period_contrasts <- function(fit) {
+    emm_period_gender <- emmeans(fit, ~ period | Gender)
+    period_contrasts <- contrast(emm_period_gender, "pairwise",
+                                 adjust = "none")
+    as_tibble(period_contrasts) %>%
+        filter(grepl("PO", contrast)) %>%
+        mutate(lower.CL = estimate - SE * qt(0.975, df),
+               upper.CL = estimate + SE * qt(0.975, df)) %>%
+        select(contrast, Gender, estimate, lower.CL, upper.CL, p.value)
+}
+
+# Helper: format p-values
+format_pval <- function(tbl, n = 4) {
+    fmt_n <- \(x) sprintf(paste0("%.", n, "f"), x)
+    thres_num <- 10^(-n)
+    thres_str <- paste0("<", fmt_n(thres_num))
+    tbl %>% mutate(p.value = ifelse(
+        p.value < thres_num, thres_str, fmt_n(round(p.value, n))))
+}
 ```
 
 ### Fixed Effects Model
@@ -207,6 +254,8 @@ $$
 Estimated marginal means from this model are shown in @tbl-emm-fx and
 @fig-emm-fx.
 
+::: {.container}
+
 ```{r}
 #| label: tbl-emm-fx
 #| tbl-cap: Estimated marginal means from fixed effects model
@@ -218,6 +267,9 @@ kable(tbl_emm_fx, digits = 4)
 
 [`r dl_tbl(tbl_emm_fx)`]{.dl-link}
 
+:::
+
+::: {.container}
 
 ```{r}
 #| label: fig-emm-fx
@@ -229,6 +281,49 @@ print(fig_emm_fx)
 ```
 
 [`r dl_fig(fig_emm_fx)`]{.dl-link}
+
+:::
+
+@tbl-gender-contrasts-fx and @tbl-period-contrasts-fx show the gender and
+period contrasts from this model.
+
+:::: {layout="[ 50, 50 ]"}
+
+::: {#first-column}
+
+```{r}
+#| label: tbl-gender-contrasts-fx
+#| tbl-cap: Gender contrasts from fixed effects model
+#| echo: false
+
+gender_contrasts_fx <- gender_contrasts(fit_fx)
+gender_contrasts_fx %>%
+    format_pval() %>%
+    kable(digits = 4)
+```
+
+[`r dl_tbl(gender_contrasts_fx)`]{.dl-link}
+
+:::
+
+::: {#second-column}
+
+```{r}
+#| label: tbl-period-contrasts-fx
+#| tbl-cap: Gender contrasts from fixed effects model
+#| echo: false
+
+period_contrasts_fx <- period_contrasts(fit_fx)
+period_contrasts_fx %>%
+    format_pval() %>%
+    kable(digits = 4)
+```
+
+[`r dl_tbl(period_contrasts_fx)`]{.dl-link}
+
+:::
+
+::::
 
 ### Random Effects Model
 
@@ -248,6 +343,8 @@ $$
 Estimated marginal means from this model are shown in @tbl-emm-rd and
 @fig-emm-rd.
 
+::: {.container}
+
 ```{r}
 #| label: tbl-emm-rd
 #| tbl-cap: Estimated marginal means from random effects model
@@ -259,6 +356,9 @@ kable(tbl_emm_rd, digits = 4)
 
 [`r dl_tbl(tbl_emm_rd)`]{.dl-link}
 
+:::
+
+::: {.container}
 
 ```{r}
 #| label: fig-emm-rd
@@ -270,6 +370,49 @@ print(fig_emm_rd)
 ```
 
 [`r dl_fig(fig_emm_rd)`]{.dl-link}
+
+:::
+
+@tbl-gender-contrasts-rd and @tbl-period-contrasts-rd show the gender and
+period contrasts from this model.
+
+:::: {layout="[ 50, 50 ]"}
+
+::: {#first-column}
+
+```{r}
+#| label: tbl-gender-contrasts-rd
+#| tbl-cap: Gender contrasts from mixed effects model
+#| echo: false
+
+gender_contrasts_rd <- gender_contrasts(fit_rd)
+gender_contrasts_rd %>%
+    format_pval() %>%
+    kable(digits = 4)
+```
+
+[`r dl_tbl(gender_contrasts_rd)`]{.dl-link}
+
+:::
+
+::: {#second-column}
+
+```{r}
+#| label: tbl-period-contrasts-rd
+#| tbl-cap: Gender contrasts from mixed effects model
+#| echo: false
+
+period_contrasts_rd <- period_contrasts(fit_rd)
+period_contrasts_rd %>%
+    format_pval() %>%
+    kable(digits = 4)
+```
+
+[`r dl_tbl(period_contrasts_rd)`]{.dl-link}
+
+:::
+
+::::
 
 <!--
  !   ╭────────────╮
