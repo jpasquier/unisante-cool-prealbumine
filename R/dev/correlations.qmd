@@ -1,0 +1,566 @@
+---
+title: |
+    ![](../img/ethz_nexus_logo.svg){width=80%} \
+    \
+    Correlations
+author: "Jérôme Pasquier"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+format:
+    html:
+        lightbox: true
+        embed-resources: true
+        html-math-method: katex
+---
+
+<!--
+ !   ╭───────╮
+ !   │ Setup │
+ !   ╰───────╯
+-->
+
+::: {.content-hidden}
+
+\DeclareMathOperator{\Cor}{Cor}
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\Var}{Var}
+
+:::
+
+```{r}
+#| label: setup
+#| include: false
+
+{
+    library(boot)
+    library(broom)
+    library(dplyr)
+    library(emmeans)
+    library(forcats)
+    library(ggplot2)
+    library(here)
+    library(kableExtra)
+    library(knitr)
+    library(lme4)
+    library(parallel)
+    library(purrr)
+    library(readxl)
+    library(svglite)
+    library(tidyr)
+    library(xfun)
+} |>
+    suppressMessages()
+
+# Set if some computations should be cached
+CACHE <- TRUE
+
+# Set cache directory
+cache_dir <- here(".cache")
+if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+
+# Ensure that git ignore cache directory
+local({
+    cache_gitignore <- file.path(cache_dir, ".gitignore")
+    if (!file.exists(cache_gitignore)) cat("*\n", file = cache_gitignore)
+})
+
+# Set number of cores for parallel processing
+options(mc.cores = detectCores() - 1)
+
+# Set seed for reproducibility (bootstrap)
+RNGkind("L'Ecuyer-CMRG")
+set.seed(666)
+
+# Set project directory
+i_am("R/dev/correlations.qmd") |> suppressMessages()
+
+
+# Set default ggplot theme
+theme_set(theme_bw())
+
+# Load preprocessed data
+load(here("data", "dta.rda"))
+
+# Convert the longitudinal data to long format
+lg <- dta$lg %>%
+    rename_with(~ sub("^(PO|6M|1Y|3Y)(_)(.+)", "\\1__\\3", .x)) %>%
+    pivot_longer(
+        cols = matches("^(PO|6M|1Y|3Y)__(.+)"),
+        names_to = c("period", ".value"),
+        names_pattern = "(.+)__(.+)"
+    ) %>%
+    mutate(
+        period = factor(period, levels = c("PO", "6M", "1Y", "3Y")),
+        IPP = factor(IPP)
+    )
+
+# Get last correlations analyses and preprocessed the results
+tbl_cor <- local({
+    period_levels <- c("PO", "6M", "1Y", "3Y", "CS", "CS_2YFU")
+    path1 <- here("results/analyses_20250528/correlations.xlsx")
+    path2 <- here("results/analyses_cs_2yfu_20250703/correlations.xlsx")
+    cor1 <- read_xlsx(path1) %>%
+        mutate(period = sub("FU_end", "CS", period))
+    cor2 <- read_xlsx(path2) %>%
+        mutate(period = sub("FU_END", "CS_2YFU", period))
+    bind_rows(cor1, cor2) %>%
+        relocate(subpop, .after = period)  %>%
+        mutate(
+            period = factor(period, period_levels),
+            gender = recode(gender, F = "Female", M = "Male", .missing = "All")
+        )
+})
+```
+
+<!--
+ !   ╭──────────────────╮
+ !   │ Download helpers │
+ !   ╰──────────────────╯
+-->
+
+```{r}
+#| label: download-helper
+#| include: false
+
+# Download a table in a CSV file
+dl_tbl <- function(tbl, text = "Download CSV") {
+    tmp_dir <- here(".cache/preAlb_tables")
+    tmp_file <- paste0(deparse(substitute(tbl)), ".csv")
+    tmp_file <- file.path(tmp_dir, tmp_file)
+    if (!dir.exists(tmp_dir)) dir.create(tmp_dir, recursive = TRUE)
+    write.csv(tbl, file = tmp_file, row.names = FALSE)
+    embed_file(tmp_file, text = text)
+}
+
+# Download a figure in a SVG file
+dl_fig <- function(fig, text = "Download SVG") {
+    tmp_dir <- here(".cache/preAlb_figures")
+    tmp_file <- paste0(deparse(substitute(fig)), ".svg")
+    tmp_file <- file.path(tmp_dir, tmp_file)
+    if (!dir.exists(tmp_dir)) dir.create(tmp_dir, recursive = TRUE)
+    svglite(tmp_file)
+    print(fig)
+    dev.off()
+    embed_file(tmp_file, text = text)
+}
+
+```
+
+```{css}
+#| echo: false
+
+.container {
+  display: flex;
+flex-direction: column;
+}
+
+.dl-link {
+  float: right;
+  font-size: 0.75em;
+  margin-top: -1.5em;
+}
+```
+
+<!--
+ !   ╭──────────────────╮
+ !   │ Raw correlations │
+ !   ╰──────────────────╯
+-->
+
+## Raw correlations
+
+The correaltions calculated in the analyses from the 2025-05-28 and 2025-07-03
+are shown in @fig-raw-correlations (click on the figure to zoom) and the
+corresponding sample sizes in @tbl-raw-correlations-n. The correlations
+estimated on the longitudinal data are less precise than the ones estimated on
+the cross-sectional data because of the smaller sample sizes. Given the wide
+confidence intervals observed in the cross-sectional, there is no obvious
+contradiction between the correlations observed from cross-sectional and
+longitudinal data.
+
+
+::: {.container}
+
+```{r}
+#| label: fig-raw-correlations
+#| fig-cap: |
+#|   Correlations between prealbumin and other biomarkers (analyses from
+#|   2025-05-28 and 2025-07-03)
+#| fig-width: 10
+#| fig-height: 8
+#| echo: false
+
+fig_raw_correlations <- tbl_cor %>%
+    filter(variable2 == "preAlb") %>%
+    mutate(period = fct_recode(period, "CS\n2YFU" = "CS_2YFU")) %>%
+    ggplot(aes(x = period, y = cor_pearson, color = gender, group = gender)) +
+    geom_point(position = position_dodge(width = .4)) +
+    geom_errorbar(aes(ymin = cor_pearson_lwr, ymax = cor_pearson_upr),
+                  position = position_dodge(width = .4), width = .2) +
+    #geom_line(position = position_dodge(width = 0.3))
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    facet_wrap(vars(variable1)) +
+    labs(x = element_blank(), y = "Pearson correlation", color = "Gender",
+         title = "Correlations between prealbumin and other biomarkers") +
+    theme(legend.position = "bottom")
+fig_raw_correlations
+```
+
+[`r dl_fig(fig_raw_correlations)`]{.dl-link style="margin-top: -1em"}
+
+:::
+
+::: {.container}
+
+```{r}
+#| label: tbl-raw-correlations-n
+#| tbl-cap: |
+#|   Sample sizes for the correlations between prealbumin and other biomarkers
+#| echo: false
+
+tbl_raw_correlations_n <- tbl_cor %>%
+    filter(variable2 == "preAlb") %>%
+    select(period, gender, variable1, nobs) %>%
+    arrange(period) %>%
+    group_by(period, gender) %>%
+    summarize(
+        nobs_min = min(nobs),
+        nobs_max = max(nobs),
+        .groups = "drop"
+    ) %>%
+    mutate(nobs = case_when(
+        nobs_min == nobs_max ~ as.character(nobs_min),
+        TRUE ~ paste0(nobs_min, "-", nobs_max)
+    )) %>%
+    select(!c(nobs_min, nobs_max)) %>%
+    pivot_wider(values_from = nobs, names_from = period)
+kable(tbl_raw_correlations_n)
+```
+
+[`r dl_tbl(tbl_raw_correlations_n)`]{.dl-link}
+
+:::
+
+### Correlations estimated from a mixed-effects model of the longitudinal data
+
+The model of the prealbumin ($Y$) with all possible interactions beteween the
+biomarker ($X$), the gender ($M$) and the period ($T_1$, $T_2$ and $T_3$) is
+given by
+
+$$
+\begin{aligned}
+Y =\;
+& \beta_0
+  + \beta_X\, X
+  + \beta_M\, M
+  + \beta_{T_1}\, T_1
+  + \beta_{T_2}\, T_2
+  + \beta_{T_3}\, T_3 \\
+& + \beta_{X:M}\, X\, M
+  + \beta_{X:T_1}\, X\, T_1
+  + \beta_{X:T_2}\, X\, T_2
+  + \beta_{X:T_3}\, X\, T_3 \\
+& + \beta_{M:T_1}\, M\, T_1
+  + \beta_{M:T_2}\, M\, T_2
+  + \beta_{M:T_3}\, M\, T_3 \\
+& + \beta_{X:M:T_1}\, X\, M\, T_1
+  + \beta_{X:M:T_2}\, X\, M\, T_2
+  + \beta_{X:M:T_3}\, X\, M\, T_3 \\
+& + b_\text{IPP} + \varepsilon,
+\end{aligned}
+$$
+
+where $b_\text{IPP} \sim N(0, \tau^2)$ is the random intercept for the
+individual patient and $\varepsilon \sim N(0, \sigma^2)$ is the error term.
+
+Gathering the terms that are not multiplied by the biomarker $X$ gives
+
+$$
+\alpha = \beta_0 + \beta_M\, M + \beta_{T_1}\, T_1 + \beta_{T_2}\, T_2
+         + \beta_{T_3}\, T_3 + \beta_{M:T_1}\, M\, T_1
+         + \beta_{M:T_2}\, M\, T_2 + \beta_{M:T_3}\, M\, T_3.
+$$
+
+whereas the terms that are multiplied by the biomarker $X$ are gathered in
+
+$$
+\begin{aligned}
+\gamma =\;
+& \beta_X + \beta_{X:M}\, M + \beta_{X:T_1}\, T_1 + \beta_{X:T_2}\, T_2
+  + \beta_{X:T_3}\, T_3 \\
+& + \beta_{X:M:T_1}\, M\, T_1 + \beta_{X:M:T_2}\, M\, T_2
+  + \beta_{X:M:T_3}\, M\, T_3.
+\end{aligned}
+$$
+
+The model can then be rewritten as
+
+$$
+Y = \alpha + \gamma\, X + b_\text{IPP} + \varepsilon.
+$$
+
+Denoting the set of covariables $M$, $T_1$, $T_2$ and $T_3$ by $Z$, the partial
+correlations between the prealbumin and the biomarkers can then be calculated
+as
+
+$$
+\rho(Z) = \Cor(X, Y \mid Z)
+        = \frac{\Cov(X, Y \mid Z)}{\sqrt{\Var(X \mid Z) \Var(Y \mid Z)}}.
+$$
+
+The variance of the biomarker $Y$ given the covariables $Z$ is given by
+
+$$
+\Var(Y \mid Z) = \Var(\alpha + \gamma\, X + b_\text{IPP} + \varepsilon \mid Z)
+               = \gamma^2 \Var(X \mid Z) + \tau^2 + \sigma^2,
+$$
+
+whereas the covariance between the prealbumin $X$ and the biomarker $Y$ given
+the covariables $Z$ is
+
+$$
+\Cov(X, Y \mid Z) = \Cov(X, \alpha + \gamma\, X + b_\text{IPP}
+                    + \varepsilon \mid Z)
+                  = \gamma \Cov(X, X \mid Z) = \gamma \Var(X \mid Z).
+$$
+
+The partial correlation between the prealbumin and the biomarker can then be
+rewritten as
+
+$$
+\rho(Z) = \frac{\gamma\, v_X(Z)}{\sqrt{\gamma^2 v_X(Z)^2 + \tau^2 + \sigma^2}},
+          \quad\text{with}\quad v_X(Z) = \Var(X \mid Z).
+$$
+
+The estimator of the partial correlation can be calculated as
+
+$$
+\hat\rho(Z) = \frac{\hat\gamma\, \hat v_X(Z)}{\sqrt{\hat\gamma^2 \hat v_X(Z)^2
+              + \hat\tau^2 + \hat\sigma^2}}.
+$$
+
+The estimates $\hat\gamma$, $\hat\tau$ and $\hat\sigma$ are obtained directly
+from from the linear mixed effect model.
+
+The estimator $\hat v_X(Z)$ is calculated as the sample variance of $X$ within
+the stratum defined by $Z$. There is at most one observations per patient (IPP)
+in each stratum.
+
+<!--
+    and its robustt standard error is calculated using the sandwich estimator.
+-->
+
+Finally, the standard error of the partial correlation estimator is obtained
+using the delta method.
+
+
+```{r}
+#| label: correlation-estimation-lmm-all
+#| echo: false
+
+estimate_partial_correlations <- function(x, bs = FALSE, bs_rep = 1e3) {
+    # Select completes cases
+    lg_cc <- drop_na(lg, all_of(x), preAlb, Gender, period)
+
+    # Rescale LMTot
+    if (x == "LMTot") lg_cc <- mutate(lg_cc, LMTot = LMTot / 1000)
+
+    # Fit a linear mixed model with all possible interactions
+    fml <- reformulate(sprintf("`%s`", x)) |>
+        update(preAlb ~ . * Gender * period + (1| IPP))
+    fit <- lmer(fml, lg_cc)
+
+    # Sample size
+    N <- model.frame(fit) |>
+        group_by(Gender, period) |>
+        summarise(n = n(), .groups = "drop")
+
+    # Get the parameters estimated from the model
+    gamma <- emtrends(fit, ~ Gender + period, var = x) |>
+        as_tibble() |>
+        rename_with(~ sub(paste0(x, ".+"), "gamma", .x))
+
+    tau_sq <- VarCorr(fit)$IPP[1, 1]
+    sigma_sq <- sigma(fit)^2
+
+    # Estimate the variance of the biomarker X within each
+    vX <- lg_cc |>
+        group_by(Gender, period) |>
+        summarise(vX = var(.data[[x]]), .groups = "drop")
+
+    # Combine estimates
+    rho <- full_join(N, gamma, by = c("Gender", "period")) |>
+        full_join(vX, by = c("Gender", "period")) |>
+        mutate(
+            # Point estimate of partial correlation
+            # ρ = γ · v / sqrt(γ² · v² + τ² + σ²)
+            denom = sqrt(gamma^2 * vX^2 + tau_sq + sigma_sq),
+            rho = gamma * vX / denom,
+
+            # Partial derivative with respect to gamma
+            # ∂ρ/∂γ = v · (τ² + σ²) / (γ² · v² + τ² + σ²)^{3/2}
+            grad = (vX * (tau_sq + sigma_sq)) / denom^3,
+
+            # Standard error of rho using delta method (simplified version)
+            # This assumes vX is fixed (estimated precisely with large n)
+            se_rho = grad * SE,
+
+            # 95% Confidence interval
+            ci_lower = rho - qnorm(.975) * se_rho,
+            ci_upper = rho + qnorm(.975) * se_rho,
+
+            # Test statistic for H0: rho = 0
+            z_stat = rho / se_rho,
+
+            # P-value (two-tailed test)
+            p_value = 2 * (1 - pnorm(abs(z_stat)))
+        ) |>
+        select(Gender, period, rho, se_rho, ci_lower, ci_upper,
+               z_stat, p_value)
+
+    # Bootstrap confidence intervals
+    if (bs) {
+
+        # Function to calculate correlation for one bootstrap sample
+        boot_corr <- function(data, indices) {
+            boot_data <- data[indices, ]
+
+            # Fit model
+            fit <- lmer(fml, boot_data)
+
+            # Get estimates
+            gamma <- emtrends(fit, ~ Gender + period, var = x) |>
+                as_tibble() |>
+                rename_with(~ sub(paste0(x, ".+"), "gamma", .x))
+
+            tau_sq <- VarCorr(fit)$IPP[1, 1]
+            sigma_sq <- sigma(fit)^2
+
+            # Calculate vX for each stratum
+            vX <- boot_data |>
+                group_by(Gender, period) |>
+                summarise(vX = var(.data[[x]]), .groups = "drop")
+
+            # Calculate correlations
+            results <- full_join(gamma, vX, by = c("Gender", "period")) |>
+                mutate(
+                    rho = gamma * vX / sqrt(gamma^2 * vX^2 + tau_sq + sigma_sq)
+                )
+
+            return(results$rho)
+        }
+
+        # Bootstrap
+        boot_results <- boot(
+            lg_cc,
+            boot_corr,
+            R = bs_rep,
+            parallel = "multicore",
+            ncpus = detectCores(),
+        )
+
+        # Calculate statistics for each stratum
+        n_strata <- length(boot_results$t0)
+
+        # Add bootstrap confidence intervals
+        boot_stats <- map_dfr(1:n_strata, function(i) {
+            boot_ci <- boot.ci(boot_results, type = "norm", index = i)
+            tibble(
+                stratum = i,
+                boot_se_rho = sd(boot_results$t[, i]),
+                boot_ci_lower = boot_ci$normal[2],
+                boot_ci_upper = boot_ci$normal[3]
+            )
+        })
+
+        # Combine with original results
+        rho <- rho |>
+            mutate(stratum = row_number()) |>
+            left_join(boot_stats, by = "stratum") |>
+            select(!stratum)
+    }
+
+    return(rho)
+}
+
+# Compute the partial correlations for each biomarker or load them from cache
+X <- c("Albumine", "ALMI", "LMI", "LMTot", "FMI", "TWL", "ALM/poids")
+rho_llm_all <- map_dfr(X, ~ {
+    estimate_partial_correlations(.x) |>
+        mutate(biomarker = .x)
+}) |>
+    relocate(biomarker)
+
+```
+
+
+```{r}
+#| label: fig-rho-llm-all
+#| fig-cap: |
+#|   Partial correlations between prealbumin and other biomarkers estimated
+#|   from the longitudinal data using a linear mixed model including all
+#|   possible interactions between gender, period, and the biomarker.
+#| echo: false
+
+fig_correlations_llm_all <- rho_llm_all |>
+    select(biomarker, Gender, period, rho, ci_lower, ci_upper) |>
+    ggplot(aes(x = period, y = rho, color = Gender)) +
+    geom_point(position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper),
+                  position = position_dodge(width = 0.6), width = .2) +
+    facet_wrap(vars(biomarker), scales = "free_y") +
+    labs(x = element_blank(), y = "Partial correlation") +
+    theme(legend.position = "bottom")
+fig_correlations_llm_all
+```
+
+[`r dl_fig(fig_correlations_llm_all)`]{.dl-link}
+
+
+
+
+
+
+
+```{r}
+#| eval: false
+#| echo: false
+
+library(sandwich)
+
+# Cluster robust estimate of the variance of the sample variance
+rob_var_smpl_var <- function(x, clus) {
+    n <- length(x)
+
+    # Rgress squared deviations on constant, use cluster-robust SE
+    fit <- lm(x ~ 1)
+
+    # Use HC1 for finite sample correction (equivalent to Stata's robust)
+    vcov_robust <- vcovCL(fit, cluster = clus, type = "HC1")
+    vcov_robust <- vcov(fit)
+
+    # The sample variance is s^2 = mean(d) * n/(n-1)
+    # So Var(s^2) = (n/(n-1))^2 * Var(mean(d))
+    var_smpl_var <- vcov_robust[1, 1] * (n / (n-1))^2
+
+    return(var_smpl_var)
+}
+
+
+library(purrr)
+map_df(levels(lg_cc$Gender), function(g) {
+    map_df(levels(lg_cc$period), function(p) {
+
+        g="F";p="PO"
+        df <- filter(lg_cc, Gender == g, period == p)
+
+        summarise(group_by(df, IPP), n = n())
+
+        fitX <- lmer(ALMI ~ 1 + (1 | IPP), data = df)
+        n <- nrow(model.frame(fitX))
+        var <- (vcov(fitX)[1,1] + sigma(fitX)^2) / (1 + 1 / n)
+        c(Gender = g, period = p, n = n, variance = var)
+
+    })
+})
+
+```
