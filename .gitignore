@@ -1,11 +1,5 @@
-.cache/*
-article/*
-data/*
-data-raw/*
-documents/*
-misc/*
-results/*
-sessions/*
-heures_697.csv
-!*/.keep
-TODO.txt
+.cache/
+data
+data-raw
+results/
+sessions/

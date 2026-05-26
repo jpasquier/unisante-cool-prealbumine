@@ -1,0 +1,25 @@
+#!/bin/bash
+
+DIRS=(
+    "/cluster/work/nexus/2025_st_favre_prealbumin/data"
+    "/cluster/work/nexus/2025_st_favre_prealbumin/data-raw"
+)
+
+# First pass: verify all directories exist
+for DIR in "${DIRS[@]}"; do
+    if [ ! -d "$DIR" ]; then
+        echo "Error: directory $DIR does not exist." >&2
+        exit 1
+    fi
+done
+
+# Second pass: create symlinks, skip if already exists
+for DIR in "${DIRS[@]}"; do
+    LINK="$(basename "$DIR")"
+    if [ -e "$LINK" ] || [ -L "$LINK" ]; then
+        echo "Skipping $LINK: already exists."
+    else
+        ln -s "$DIR" "$LINK"
+        echo "Created symlink: $LINK -> $DIR"
+    fi
+done
