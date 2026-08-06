@@ -16,7 +16,8 @@ ARTICLE_V1_SCRIPTS := \
 	code/article_v1/suppl_table_1.R
 
 ARTICLE_V2_SCRIPTS := \
-	code/article_v2/table1.R
+	code/article_v2/table1.R \
+	code/article_v2/table2.R
 
 PREPROCESS_SCRIPT_1 := code/exploratory/data_preprocessing.R
 
