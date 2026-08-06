@@ -17,6 +17,8 @@ ARTICLE_V1_SCRIPTS := \
 
 PREPROCESS_SCRIPT_1 := code/exploratory/data_preprocessing.R
 
+PREPROCESS_SCRIPT_2 := code/article_v2/preprocess_data.R
+
 # Default: do not run preprocessing automatically (explicit only)
 all: symlinks exploratory article_v1
 	@echo "Done: all (note: preprocess_data_1 is intentionally excluded; run 'make preprocess_data_1' explicitly)"
@@ -31,7 +33,10 @@ exploratory: $(EXPLORATORY_SCRIPTS)
 article_v1: $(ARTICLE_V1_SCRIPTS)
 	@echo "Article V1 outputs finished."
 
-preprocess_data_1: $(PREPROCESS_SCRIPT_1)
+preprocess_data_1: symlinks $(PREPROCESS_SCRIPT_1)
+	@echo "Data preprocessing finished."
+
+preprocess_data_2: symlinks $(PREPROCESS_SCRIPT_2)
 	@echo "Data preprocessing finished."
 
 clean:
@@ -39,11 +44,11 @@ clean:
 	@rm -rf -- output/ .cache/
 
 # Rules to run R scripts and shell scripts
-$(filter %.R,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1)):
+$(filter %.R,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
 	@echo "Running R script: $@"
 	@$(RSCRIPT) "$@"
 
-$(filter %.sh,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS)):
+$(filter %.sh,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
 	@echo "Running shell script: $@"
 	@$(SH) "$@"
 
@@ -55,7 +60,8 @@ help:
 	@echo "  exploratory         - run exploratory analysis scripts"
 	@echo "  article_v1          - run article_v1 scripts"
 	@echo "  preprocess_data_1   - run data preprocessing (must be invoked explicitly)"
+	@echo "  preprocess_data_2   - run data preprocessing (new data, must be invoked explicitly)"
 	@echo "  clean               - remove output/ and .cache/"
 	@echo "  help                - show this help"
 
-.PHONY: all symlinks exploratory article_v1 preprocess_data_1 clean help $(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1)
+.PHONY: all symlinks exploratory article_v1 preprocess_data_1 preprocess_data_2 clean help $(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)
