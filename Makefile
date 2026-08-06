@@ -15,12 +15,15 @@ ARTICLE_V1_SCRIPTS := \
 	code/article_v1/table_3.R \
 	code/article_v1/suppl_table_1.R
 
+ARTICLE_V2_SCRIPTS := \
+	code/article_v2/table1.R
+
 PREPROCESS_SCRIPT_1 := code/exploratory/data_preprocessing.R
 
 PREPROCESS_SCRIPT_2 := code/article_v2/preprocess_data.R
 
 # Default: do not run preprocessing automatically (explicit only)
-all: symlinks exploratory article_v1
+all: symlinks exploratory article_v1 article_v2
 	@echo "Done: all (note: preprocess_data_1 is intentionally excluded; run 'make preprocess_data_1' explicitly)"
 
 # Symlinks target - prefers an executable script `make_symlinks` if present
@@ -33,6 +36,9 @@ exploratory: $(EXPLORATORY_SCRIPTS)
 article_v1: $(ARTICLE_V1_SCRIPTS)
 	@echo "Article V1 outputs finished."
 
+article_v2: $(ARTICLE_V2_SCRIPTS)
+	@echo "Article V2 outputs finished."
+
 preprocess_data_1: symlinks $(PREPROCESS_SCRIPT_1)
 	@echo "Data preprocessing finished."
 
@@ -44,11 +50,11 @@ clean:
 	@rm -rf -- output/ .cache/
 
 # Rules to run R scripts and shell scripts
-$(filter %.R,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
+$(filter %.R,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(ARTICLE_V2_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
 	@echo "Running R script: $@"
 	@$(RSCRIPT) "$@"
 
-$(filter %.sh,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
+$(filter %.sh,$(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(ARTICLE_V2_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)):
 	@echo "Running shell script: $@"
 	@$(SH) "$@"
 
@@ -59,9 +65,10 @@ help:
 	@echo "  symlinks            - create repository symlinks (expects ./make_symlinks executable)"
 	@echo "  exploratory         - run exploratory analysis scripts"
 	@echo "  article_v1          - run article_v1 scripts"
+	@echo "  article_v2          - run article_v2 scripts"
 	@echo "  preprocess_data_1   - run data preprocessing (must be invoked explicitly)"
 	@echo "  preprocess_data_2   - run data preprocessing (new data, must be invoked explicitly)"
 	@echo "  clean               - remove output/ and .cache/"
 	@echo "  help                - show this help"
 
-.PHONY: all symlinks exploratory article_v1 preprocess_data_1 preprocess_data_2 clean help $(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)
+.PHONY: all symlinks exploratory article_v1 preprocess_data_1 preprocess_data_2 clean help $(EXPLORATORY_SCRIPTS) $(ARTICLE_V1_SCRIPTS) $(ARTICLE_V2_SCRIPTS) $(PREPROCESS_SCRIPT_1) $(PREPROCESS_SCRIPT_2)
