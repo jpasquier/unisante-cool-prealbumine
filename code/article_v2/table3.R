@@ -16,7 +16,8 @@ suppressPackageStartupMessages({
 i_am("code/article_v2/table3.R")
 
 data_dir <- here("data")
-output_dir <- here("output")
+output_dir <- here("output/article_v2")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Load data
 load(here(data_dir, "data_july_2026.rda"))
@@ -162,3 +163,66 @@ kable(table3_panel_a, align = c("l", "c", "c", "c"), row.names = FALSE)
 # ╭───────────────────────────────────────────────────────────────────────────╮
 # │    Table 3, Panel B:  Association with the preoperative lean mass lost    │
 # ╰───────────────────────────────────────────────────────────────────────────╯
+
+# `TLML%` is the lean mass lost since surgery, expressed as a percentage of
+# preoperative lean mass. Regressions are fitted separately at each follow-up
+# and adjusted for sex. The predictor is scaled so that a one-unit increase
+# represents a 0.05 g/L decrease in prealbumin.
+format_signed_ci <- function(estimate, lower, upper) {
+    value <- sprintf("%+.2f (%+.2f to %+.2f)", estimate, lower, upper)
+    gsub("-", "−", value, fixed = TRUE)
+}
+
+analyse_continuous_outcome <- function(time_code) {
+    d <- lg |>
+        filter(`FU-CC` == time_code) |>
+        mutate(
+            Gender = factor(Gender, levels = c("F", "M")),
+            prealbumin_decrease_005 = -preAlb / 0.05
+        )
+
+    fit <- lm(`TLML%` ~ prealbumin_decrease_005 + Gender, data = d)
+    coefficient <- summary(fit)$coefficients["prealbumin_decrease_005", ]
+
+    # Asymptotic Wald confidence limits. P value is the two-sided t-test
+    # reported by the linear model.
+    # ╭──────────────────────────────────────────────────────────────────────╮
+    # │ ╭──────────────────────────────────────────────────────────────────╮ │
+    # │ │ ╭──────────────────────────────────────────────────────────────╮ │ │
+    # │ │ │ TODO: Consider using confint(fit, "prealbumin_decrease_005") │ │ │
+    # │ │ │ for profile likelihood                                       │ │ │
+    # │ │ ╰──────────────────────────────────────────────────────────────╯ │ │
+    # │ ╰──────────────────────────────────────────────────────────────────╯ │
+    # ╰──────────────────────────────────────────────────────────────────────╯
+    estimate <- unname(coefficient["Estimate"])
+    standard_error <- unname(coefficient["Std. Error"])
+    interval <- estimate + c(-1, 1) * qnorm(0.975) * standard_error
+
+    c(
+        `Patients assessed, n` = as.character(nobs(fit)),
+        `Lean mass lost, % of preoperative value` = sprintf(
+            "%.1f (%.1f)", mean(d$`TLML%`), sd(d$`TLML%`)
+        ),
+        `Difference per 0.05 g/L lower prealbumin, percentage points (95% CI)` =
+            format_signed_ci(estimate, interval[1], interval[2]),
+        `P value` = sprintf("%.3f", coefficient["Pr(>|t|)"])
+    )
+}
+
+table3_panel_b <- map(time_levels, analyse_continuous_outcome) |>
+    as.data.frame(check.names = FALSE) |>
+    tibble::rownames_to_column("Characteristic")
+
+# Display Table 3, panel B
+kable(table3_panel_b, align = c("l", "c", "c", "c"), row.names = FALSE)
+
+# Save both panels in one workbook
+write_xlsx(
+    list(`Panel A` = table3_panel_a, `Panel B` = table3_panel_b),
+    file.path(output_dir, "table3.xlsx")
+)
+
+# Session information
+sink(file.path(output_dir, "table3_sessionInfo.txt"))
+sessionInfo()
+sink()
