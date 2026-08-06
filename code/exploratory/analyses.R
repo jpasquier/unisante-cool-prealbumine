@@ -14,7 +14,7 @@ library(writexl)
 options(mc.cores = detectCores() - 1)
 
 # Working directory
-i_am("R/analyses.R") |> suppressMessages()
+i_am("code/exploratory/analyses.R") |> suppressMessages()
 
 # Helper(s)
 `%~=%` <- function(x, y) {
@@ -22,8 +22,8 @@ i_am("R/analyses.R") |> suppressMessages()
 }
 
 # Output directory
-outdir <- here(paste0("results/analyses_", format(Sys.Date(), "%Y%m%d")))
-if (!dir.exists(outdir)) dir.create(outdir)
+outdir <- here("output/exploratory/analyses")
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data", "lg.rda"))

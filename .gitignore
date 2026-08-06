@@ -1,5 +1,5 @@
 .cache/
 data
 data-raw
-results/
+output/
 sessions/

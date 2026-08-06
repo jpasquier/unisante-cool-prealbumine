@@ -13,7 +13,8 @@
     suppressMessages()
 
 # Set working directory
-i_am("R/visualize_raw_correlations.R") |> suppressMessages()
+i_am("code/exploratory/visualize_raw_correlations.R") |> suppressMessages()
+output_dir <- here("output/exploratory")
 
 # Set default ggplot theme
 theme_set(theme_bw())
@@ -21,8 +22,8 @@ theme_set(theme_bw())
 # Get last correlations analyses and preprocessed the results
 tbl_cor <- local({
     period_levels <- c("PO", "6M", "1Y", "3Y", "CS", "CS_2YFU")
-    path1 <- here("results/analyses_20250528/correlations.xlsx")
-    path2 <- here("results/analyses_cs_2yfu_20250703/correlations.xlsx")
+    path1 <- file.path(output_dir, "analyses/correlations.xlsx")
+    path2 <- file.path(output_dir, "analyses_cs_2yfu/correlations.xlsx")
     cor1 <- read_xlsx(path1) |>
         mutate(period = sub("FU_end", "CS", period))
     cor2 <- read_xlsx(path2) |>
@@ -94,9 +95,7 @@ combined_fig <- ggarrange(
 )
 
 # Export the combined figure
-today <- format(Sys.Date(), "%Y%m%d")
-output_file <- paste0("visualize_raw_correlations_", today, ".svg")
-output_file <- here("results", output_file)
+output_file <- file.path(output_dir, "visualize_raw_correlations.svg")
 svglite(output_file, width = 12, height = 12 / sqrt(2))
 print(combined_fig)
 dev.off() |> invisible()

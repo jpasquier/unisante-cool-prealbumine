@@ -23,7 +23,7 @@ options(mc.cores = detectCores() - 1)
 
 # Working directory
 # i_am("R/analyses.R") |> suppressMessages()
-i_am("R/analyses_cs_2yfu.R") |> suppressMessages()
+i_am("code/exploratory/analyses_cs_2yfu.R") |> suppressMessages()
 
 # Helper(s)
 `%~=%` <- function(x, y) {
@@ -32,9 +32,8 @@ i_am("R/analyses_cs_2yfu.R") |> suppressMessages()
 
 # Output directory
 # outdir <- here(paste0("results/analyses_", format(Sys.Date(), "%Y%m%d")))
-outdir <- here(paste0("results/analyses_cs_2yfu_",
-                      format(Sys.Date(), "%Y%m%d")))
-if (!dir.exists(outdir)) dir.create(outdir)
+outdir <- here("output/exploratory/analyses_cs_2yfu")
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data", "dta.rda"))

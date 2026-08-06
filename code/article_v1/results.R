@@ -8,7 +8,14 @@
     suppressMessages()
 
 # Set working directory
-i_am("R/article/results.R") |> suppressMessages()
+i_am("code/article_v1/results.R") |> suppressMessages()
+
+# Output file
+output_dir <- here("output/article_v1")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+output_file <- file.path(output_dir, "results.txt")
+if (file.exists(output_file)) file.remove(output_file)
+sink(output_file)
 
 # Load preprocessed data
 load(here("data", "dta.rda"))

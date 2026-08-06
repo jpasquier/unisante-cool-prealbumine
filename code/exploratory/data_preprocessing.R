@@ -9,7 +9,7 @@ library(tidyr)
 options(mc.cores = detectCores() - 1)
 
 # Working directory
-i_am("R/data_preprocessing.R") |> suppressMessages()
+i_am("code/exploratory/data_preprocessing.R") |> suppressMessages()
 
 # Helper(s)
 `%~=%` <- function(x, y) {

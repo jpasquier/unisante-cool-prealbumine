@@ -12,7 +12,10 @@
     suppressMessages()
 
 # Set working directory
-i_am("R/article/table_1.R") |> suppressMessages()
+i_am("code/article_v1/table_1.R") |> suppressMessages()
+
+output_dir <- here("output", "article_v1")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data", "dta.rda"))
@@ -99,7 +102,5 @@ table1 <- map_dfr(c("BMIc", "preAlb", "TWL"), function(y) {
 # Display table 1
 kable(table1)
 
-#  Optional: Save table 1 to an Excel file
-if (FALSE) {
-    write_xlsx(table1, "~/table_1.xlsx")
-}
+#  Save table 1 to an Excel file
+write_xlsx(table1, file.path(output_dir, "table_1.xlsx"))

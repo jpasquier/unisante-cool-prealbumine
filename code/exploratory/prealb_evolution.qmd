@@ -41,7 +41,7 @@ format:
 theme_set(theme_bw())
 
 # Working directory
-i_am("R/prealb_evolution.qmd") |> suppressMessages()
+i_am("code/exploratory/prealb_evolution.qmd") |> suppressMessages()
 
 # Load preprocessed data
 load(here("data", "dta.rda"))
@@ -98,7 +98,7 @@ dl_fig <- function(fig, text = "Download SVG") {
 ```
 
 ```{css}
-#| echo: false
+/*| echo: false */
 
 .container {
   display: flex;

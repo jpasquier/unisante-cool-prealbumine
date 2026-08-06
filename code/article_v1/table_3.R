@@ -6,7 +6,10 @@ library(tidyr)
 library(writexl)
 
 # Set working directory
-i_am("R/article/table_3.R")
+i_am("code/article_v1/table_3.R")
+
+output_dir <- here("output", "article_v1")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data/lg.rda"))
@@ -61,7 +64,5 @@ table3 <- bind_rows(table3, N) |>
 # Display table 3
 kable(table3)
 
-#  Optional: Save table 3 to an Excel file
-if (FALSE) {
-    write_xlsx(table3, "~/table_3.xlsx")
-}
+# Save table 3 to an Excel file
+write_xlsx(table3, file.path(output_dir, "table_3.xlsx"))

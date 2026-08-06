@@ -3,7 +3,10 @@ library(knitr)
 library(writexl)
 
 # Set working directory
-i_am("R/article/table_2.R")
+i_am("code/article_v1/table_2.R")
+
+output_dir <- here("output", "article_v1")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data/lg.rda"))
@@ -48,8 +51,6 @@ table2 <- function(n = TRUE) do.call(rbind, lapply(periods, function(p) {
 # Display table 2
 kable(table2())
 
-#  Optional: Save table 2 to an Excel file
-if (FALSE) {
-    write_xlsx(table2(n = FALSE), "~/table_2.xlsx")
-    write_xlsx(table2(), "~/table_2_with_N.xlsx")
-}
+#  Save table 2 to an Excel file
+write_xlsx(table2(n = FALSE), here(output_dir, "table_2.xlsx"))
+write_xlsx(table2(), here(output_dir, "table_2_with_N.xlsx"))

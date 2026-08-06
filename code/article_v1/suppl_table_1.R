@@ -9,7 +9,10 @@
     suppressMessages()
 
 # Set working directory
-i_am("R/article/suppl_table_1.R") |> suppressMessages()
+i_am("code/article_v1/suppl_table_1.R") |> suppressMessages()
+
+output_dir <- here("output", "article_v1")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 # Load preprocessed data
 load(here("data/lg.rda"))
@@ -45,7 +48,5 @@ tbl <-  map_dfr(c("FU_end", "6M", "1Y", "3Y"), function(p) {
 # Display supplementary table 1
 kable(tbl)
 
-#  Optional: Save supplementary table 1 to an Excel file
-if (FALSE) {
-    write_xlsx(tbl, "~/suppl_table_1.xlsx")
-}
+# Save supplementary table 1 to an Excel file
+write_xlsx(tbl, file.path(output_dir, "suppl_table_1.xlsx"))
