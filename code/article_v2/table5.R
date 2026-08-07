@@ -68,12 +68,12 @@ format_partial_correlation <- function(estimate, lower, upper) {
 }
 
 # Model per outcome and covariates
-analyse_outcome <- function(label, variable, digits, covariates) {
+analyse_outcome <- function(label, variable, digits, covariates, data = cs) {
     formula <- reformulate(
         c("prealbumin_decrease_005", covariates),
         response = paste0("`", variable, "`")
     )
-    fit <- lm(formula, data = cs)
+    fit <- lm(formula, data = data)
     coefficient <- summary(fit)$coefficients["prealbumin_decrease_005", ]
 
     # Difference per 0.05 g/L lower prealbumin
@@ -137,9 +137,41 @@ kable(
     row.names = FALSE
 )
 
-# Save Panel A in a workbook that can later receive Panels B and C
+# ╭───────────────────────────────────────────────────────────────────────────╮
+# │  Table 5, Panel B: Association with ALMI according to time since surgery  │
+# ╰───────────────────────────────────────────────────────────────────────────╯
+
+time_groups <- list(
+    `3 to <5 years` = function(x) x >= 3 & x < 5,
+    `5 to <10 years` = function(x) x >= 5 & x < 10,
+    `≥10 years` = function(x) x >= 10
+)
+
+analyse_almi_stratum <- function(group_label, in_group) {
+    analyse_outcome(
+        label = paste0(group_label, " (n = ", nrow(d), ")"),
+        variable = "ALMI",
+        digits = 2,
+        covariates = c("Gender", "age"),
+        data = filter(cs, in_group(FU_CC_calc))
+    )
+}
+
+table5_panel_b <- imap_dfr(
+    time_groups,
+    ~ analyse_almi_stratum(..2, ..1)
+)
+
+# Display Table 5, panel B
+kable(
+    table5_panel_b,
+    align = c("l", "c", "c", "c"),
+    row.names = FALSE
+)
+
+# Save Panels A and B in separate worksheets
 write_xlsx(
-    list(`Panel A` = table5_panel_a),
+    list(`Panel A` = table5_panel_a, `Panel B` = table5_panel_b),
     file.path(output_dir, "table5.xlsx")
 )
 
