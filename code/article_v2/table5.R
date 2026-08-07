@@ -28,6 +28,7 @@ cs <- cs |>
         Gender = factor(Gender, levels = c("F", "M")),
         FU_CC_calc = time_length(interval(DateBS, Date), "years"),
         prealbumin_decrease_005 = -preAlb / 0.05,
+        low_prealbumin = preAlb < 0.20,
         LMTot = LMTot / 1000
     )
 
@@ -156,7 +157,8 @@ analyse_almi_stratum <- function(group_label, in_group) {
         digits = 2,
         covariates = c("Gender", "age"),
         data = d
-    )
+    ) |>
+        select(-`Excludes |r| = 0.30`)
 }
 
 table5_panel_b <- imap_dfr(
@@ -171,9 +173,60 @@ kable(
     row.names = FALSE
 )
 
-# Save Panels A and B in separate worksheets
+# ╭───────────────────────────────────────────────────────────────────────────╮
+# │ Table 5, Panel C: Body composition by clinical prealbumin threshold  │
+# ╰────────────────────────────────────────────────────────────────────────────╯
+
+format_mean_sd <- function(x, digits) {
+    sprintf(
+        paste0("%.", digits, "f (%.", digits, "f)"),
+        mean(x), sd(x)
+    )
+}
+
+analyse_threshold_groups <- function(label, variable, digits) {
+    low <- cs[[variable]][cs$low_prealbumin]
+    high <- cs[[variable]][!cs$low_prealbumin]
+
+    formula <- reformulate(
+        c("low_prealbumin", "Gender", "age", "FU_CC_calc"),
+        response = paste0("`", variable, "`")
+    )
+    fit <- lm(formula, data = cs)
+    coefficient <- summary(fit)$coefficients["low_prealbuminTRUE", ]
+    estimate <- unname(coefficient["Estimate"])
+    effect_interval <- unname(confint(fit)["low_prealbuminTRUE", ])
+
+    tibble(
+        Characteristic = label,
+        `Prealbumin < 0.20 g/L, n = 80` = format_mean_sd(low, digits),
+        `Prealbumin ≥ 0.20 g/L, n = 230` = format_mean_sd(high, digits),
+        `Adjusted difference (95% CI)` = format_effect_ci(
+            estimate, effect_interval[1], effect_interval[2], digits
+        ),
+        P = sprintf("%.3f", coefficient["Pr(>|t|)"])
+    )
+}
+
+table5_panel_c <- pmap_dfr(
+    outcome_spec,
+    ~ analyse_threshold_groups(..1, ..2, ..3)
+)
+
+# Display Table 5, panel C
+kable(
+    table5_panel_c,
+    align = c("l", "c", "c", "c", "c"),
+    row.names = FALSE
+)
+
+# Save Panels A, B and C in separate worksheets
 write_xlsx(
-    list(`Panel A` = table5_panel_a, `Panel B` = table5_panel_b),
+    list(
+        `Panel A` = table5_panel_a,
+        `Panel B` = table5_panel_b,
+        `Panel C` = table5_panel_c
+    ),
     file.path(output_dir, "table5.xlsx")
 )
 
