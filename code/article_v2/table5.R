@@ -148,12 +148,14 @@ time_groups <- list(
 )
 
 analyse_almi_stratum <- function(group_label, in_group) {
+    d <- filter(cs, in_group(FU_CC_calc))
+
     analyse_outcome(
         label = paste0(group_label, " (n = ", nrow(d), ")"),
         variable = "ALMI",
         digits = 2,
         covariates = c("Gender", "age"),
-        data = filter(cs, in_group(FU_CC_calc))
+        data = d
     )
 }
 
