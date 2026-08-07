@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
     library(dplyr)
     library(here)
     library(knitr)
+    library(lubridate)
     library(purrr)
     library(tibble)
     library(writexl)
@@ -25,7 +26,7 @@ cs <- cs |>
     rename_with(~ sub("^DX[0-9]{2}_", "", .x)) |>
     mutate(
         Gender = factor(Gender, levels = c("F", "M")),
-        FU_CC_calc = as.numeric(Date - DateBS) / 365.25,
+        FU_CC_calc = time_length(interval(DateBS, Date), "years"),
         prealbumin_decrease_005 = -preAlb / 0.05,
         LMTot = LMTot / 1000
     )

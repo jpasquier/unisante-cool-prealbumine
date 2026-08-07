@@ -6,6 +6,7 @@
 library(dplyr)
 library(here)
 library(knitr)
+library(lubridate)
 library(purrr)
 library(tibble)
 library(writexl)
@@ -24,7 +25,7 @@ cs <- cs |>
     rename_with(~ sub("^DX[0-9]{2}_", "", .x)) |>
     mutate(
         # Calculate follow-up from the DXA assessment date.
-        FU_CC_calc = as.numeric(Date - DateBS) / 365.25,
+        FU_CC_calc = time_length(interval(DateBS, Date), "years"),
         FU_CC_3to5 = FU_CC_calc >= 3 & FU_CC_calc < 5,
         FU_CC_5to10 = FU_CC_calc >= 5 & FU_CC_calc < 10,
         FU_CC_10plus = FU_CC_calc >= 10,
