@@ -153,7 +153,7 @@ analyse_assessment <- function(
 set.seed(424242)
 
 table3_panel_a <- map(time_levels, analyse_assessment,
-                      auc_ci_method = "delong") |>
+                      auc_ci_method = "bootstrap") |>
     as.data.frame(check.names = FALSE) |>
     tibble::rownames_to_column("Characteristic")
 
@@ -183,20 +183,8 @@ analyse_continuous_outcome <- function(time_code) {
 
     fit <- lm(`TLML%` ~ prealbumin_decrease_005 + Gender, data = d)
     coefficient <- summary(fit)$coefficients["prealbumin_decrease_005", ]
-
-    # Asymptotic Wald confidence limits. P value is the two-sided t-test
-    # reported by the linear model.
-    # ╭──────────────────────────────────────────────────────────────────────╮
-    # │ ╭──────────────────────────────────────────────────────────────────╮ │
-    # │ │ ╭──────────────────────────────────────────────────────────────╮ │ │
-    # │ │ │ TODO: Consider using confint(fit, "prealbumin_decrease_005") │ │ │
-    # │ │ │ for profile likelihood                                       │ │ │
-    # │ │ ╰──────────────────────────────────────────────────────────────╯ │ │
-    # │ ╰──────────────────────────────────────────────────────────────────╯ │
-    # ╰──────────────────────────────────────────────────────────────────────╯
     estimate <- unname(coefficient["Estimate"])
-    standard_error <- unname(coefficient["Std. Error"])
-    interval <- estimate + c(-1, 1) * qnorm(0.975) * standard_error
+    interval <- unname(confint(fit)["prealbumin_decrease_005", ])
 
     c(
         `Patients assessed, n` = as.character(nobs(fit)),
@@ -221,6 +209,62 @@ write_xlsx(
     list(`Panel A` = table3_panel_a, `Panel B` = table3_panel_b),
     file.path(output_dir, "table3.xlsx")
 )
+
+# Table 3 caption
+ranges <- list(
+    sensitivity = "Sensitivity",
+    ppv = "Positive predictive value",
+    plr = "Positive likelihood ratio"
+) |>
+    map(\(x) {
+        table3_panel_a[
+            grepl(x, table3_panel_a$Characteristic),
+            !grepl("Characteristic", names(table3_panel_a))
+        ] |>
+            sub(pattern = "\\(.+\\)", replacement = "") |>
+            as.numeric() |>
+            range()
+    })
+
+c(
+    "Panel A evaluates prealbumin as a diagnostic test against a clinically
+    established criterion of excessive lean mass loss, namely lean mass
+    accounting for more than 25%% of the weight lost since surgery. The index
+    test was prealbumin, analysed both as a continuous variable, through the
+    area under the receiver operating characteristic curve, and dichotomised at
+    the clinical threshold of 0.20 g/L. The reference standard was dual-energy
+    X-ray absorptiometry performed at the same visit. Confidence intervals for
+    the area under the curve were obtained by bootstrap resampling, and Wilson
+    intervals were used for proportions.",
+    "Panel B analyses the percentage of preoperative lean mass lost as a
+    continuous outcome. No dichotomisation was applied, because no threshold
+    for this quantity is established in the literature and, as shown in
+    Supplementary Figure S1, estimates depend on the threshold chosen. Values
+    in the second row are mean (SD) of the outcome; the following rows give the
+    linear regression coefficient adjusted for sex, expressed as the additional
+    percentage of preoperative lean mass lost for each 0.05 g/L decrease in
+    prealbumin.",
+    "The area under the curve did not differ from 0.50 at any time point, and
+    was numerically below it at 6 months and 1 year, indicating that lower
+    prealbumin concentrations were not associated with a greater proportion of
+    lean mass in the weight lost. At the clinical threshold of 0.20 g/L,
+    sensitivity ranged from %s to %s, so that between three quarters and
+    nine tenths of patients meeting the criterion were not identified, and
+    positive predictive values ranged from %s to %s. Positive likelihood
+    ratios were between %s and %s, whereas a clinically useful test
+    requires a value above."
+) |>
+    lapply(\(p) paste(strwrap(p), collapse = " ")) |>
+    paste(collapse = "\n\n") |>
+    sprintf(
+        ranges$sensitivity[1],
+        ranges$sensitivity[2],
+        ranges$ppv[1],
+        ranges$ppv[2],
+        ranges$plr[1],
+        ranges$plr[2]
+    ) |>
+    cat(file = here(output_dir, "table3_caption.txt"))
 
 # Session information
 sink(file.path(output_dir, "table3_sessionInfo.txt"))
