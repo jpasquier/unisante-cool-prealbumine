@@ -1,21 +1,49 @@
-# Is Prealbumin a Good Biomarker of Lean-Mass Loss After Roux-en-Y Gastric Bypass?
+# Prealbumin and lean mass after Roux-en-Y gastric bypass
 
-## Study summary
+## Study overview
 
-___BASED ON THE FIRST VERSION, TO BE UPDATED___
+This observational study evaluates whether serum prealbumin is associated with
+DXA-derived lean mass and can identify excessive lean-mass loss after Roux-en-Y
+gastric bypass. It combines a longitudinal cohort of 178 participants assessed
+before surgery and up to 3 years afterwards with a complementary
+cross-sectional cohort of 310 participants assessed more than 3 years after
+surgery.
 
-This single-centre study followed 243 adults (median follow-up ≈ 3 years) who had undergone laparoscopic Roux-en-Y gastric bypass to test whether plasma prealbumin reflects absolute lean mass—or loss of lean mass—measured by DXA. Across the cross-sectional cohort and a longitudinal sub-set (baseline, 6 months, 1 year, 3 years), prealbumin showed **no meaningful correlation** with appendicular lean-mass index, total lean-mass index or fat-mass index, nor did low prealbumin (< 0.20 g L⁻¹) identify participants who lost > 25 % lean mass. The findings suggest that routine prealbumin monitoring is **not a reliable proxy for post-operative protein malnutrition** in this population.
+## Analysis code
 
-## Analytical workflow (`analyses.R`)
+The analyses for the current version of the manuscript are documented in
+[`code/article_v2`](code/article_v2):
 
-The R script documents every step that produced the numerical and graphical results found in the manuscript:
+| Script | Content |
+|---|---|
+| `preprocess_data.R` | Imports and prepares the longitudinal and cross-sectional source data. |
+| `table1.R` | Baseline characteristics of the longitudinal cohort. |
+| `table2.R` | Longitudinal changes through 3 years using mixed-effects models. |
+| `table3.R` | Diagnostic and regression analyses of lean-mass loss; also produces Figure 1. |
+| `table4.R` | Characteristics of the long-term cross-sectional cohort. |
+| `table5.R` | Cross-sectional associations between prealbumin and body composition. |
+| `tableS1.R` | Comparison of participants with and without a 3-year DXA assessment. |
+| `figureS1.R` | AUCs across alternative lean-mass-loss thresholds. |
+| `figure2.R` | Sex-specific associations of prealbumin with ALMI and ALM/body weight. |
 
-| Stage                         | Key actions                                                                                                                                                                                                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Data import & cleaning**    | • Reads longitudinal and cross-sectional Excel workbooks from *data-raw/*.<br>• Proceeds to integrity checks, removes unit/empty columns, standardises variable names.                                                                                                   |
-| **Descriptive summaries**     | • Builds tables of n, mean ± SD for body-composition indices and prealbumin.<br>• Compares subgroups (gender, prealbumin category, Δ-lean-mass category) with two-sample *t*- and Wilcoxon tests.                                                                        |
-| **Group-difference figures**  | • Creates error-bar plots for each period × variable combination and saves SVG + PPTX files.                                                                                                                                                                             |
-| **Correlation analysis**      | • For every period, gender and biomarker pair (prealbumin, Δ-prealbumin, albumin vs. ALMI, LMI, FMI) computes Pearson *r* and Spearman ρ with 95 % CIs.<br>• Exports a master `correlations.xlsx` and matching scatter plots with in-panel statistics.                   |
-| **Outputs & reproducibility** | • All tables (`tables.xlsx`, `correlations.xlsx`), graphics (`correlations/*.svg`, single-slide `.pptx`) and `sessionInfo.txt` are written to `results/analyses_<date>/`.<br>• Random-seed-free code; parallelisation is used only for speed, not stochastic procedures. |
+Generated tables, figures, captions, and session information are written to
+`output/article_v2`. The scripts in `code/article_v1` and `code/exploratory`
+relate to earlier or exploratory work and are not the reference analyses for
+the current manuscript.
 
-> **Note:** The repository shares **code only** for documentation; the underlying clinical data are confidential and therefore omitted.
+## Data availability and reproducibility
+
+The underlying clinical data cannot be made publicly available because of
+privacy and ethical restrictions. The scripts are therefore provided publicly
+for documentation and methodological transparency only; this repository is not
+a standalone reproducibility package for external users.
+
+For authorized study investigators who have access to the source data, the
+workflow is fully reproducible. After placing the required source files in
+`data-raw`, the analysis datasets and manuscript outputs can be regenerated
+with:
+
+```sh
+make preprocess_data_2
+make article_v2
+```
