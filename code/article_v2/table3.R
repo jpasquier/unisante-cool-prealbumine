@@ -258,6 +258,19 @@ pdf(
 draw_figure1()
 dev.off()
 
+# ROC Data
+map_dfr(assessment_results, \(result) {
+    data.frame(
+        thresholds = result$roc_fit$thresholds,
+        sensitivities = result$roc_fit$sensitivities,
+        specificities = result$roc_fit$specificities
+    )
+}, .id = "time_point") |>
+    write.csv(
+        file.path(output_dir, "figure1_roc_data.csv"),
+        row.names = FALSE
+    )
+
 # ╭───────────────────────────────────────────────────────────────────────────╮
 # │    Table 3, Panel B:  Association with the preoperative lean mass lost    │
 # ╰───────────────────────────────────────────────────────────────────────────╯
