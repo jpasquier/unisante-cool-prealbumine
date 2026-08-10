@@ -31,7 +31,8 @@ sparse_case_limit <- 15
 
 # At each threshold, the outcome is lean mass lost since surgery as a
 # percentage of preoperative lean mass (`TLML%`) greater than that threshold.
-# The risk score is oriented a priori so that lower prealbumin means higher
+# The risk score uses prealbumin measured at the corresponding postoperative
+# assessment and is oriented a priori so that lower prealbumin means higher
 # predicted risk.
 analyse_thresholds <- function(time_code, time_label) {
     d <- lg |>
@@ -167,13 +168,14 @@ dev.off()
 
 # Caption
 c(
-    "Supplementary Figure S1. Discrimination of preoperative prealbumin for
-    different definitions of postoperative lean-mass loss. At each threshold
-    on the horizontal axis, cases were defined as participants who had lost
-    more than that percentage of their preoperative lean mass. Receiver
-    operating characteristic analyses were performed separately at 6 months
-    (A), 1 year (B), and 3 years (C). Prealbumin was oriented a priori so that
-    lower concentrations represented greater predicted risk.",
+    "Supplementary Figure S1. Discrimination of serum prealbumin for different
+    definitions of postoperative lean-mass loss. At each threshold on the
+    horizontal axis, cases were defined as participants who had lost more than
+    that percentage of their preoperative lean mass. Receiver operating
+    characteristic analyses used the prealbumin concentration measured at the
+    corresponding assessment and were performed separately at 6 months (A), 1
+    year (B), and 3 years (C). Prealbumin was oriented a priori so that lower
+    concentrations represented greater predicted risk.",
     "Solid lines show the area under the receiver operating characteristic
     curve (AUC), shaded bands show DeLong 95% confidence intervals, and the
     dashed horizontal line indicates no discrimination (AUC = 0.50). Light
