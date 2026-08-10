@@ -109,42 +109,53 @@ analyse_assessment <- function(
         log(positive_likelihood_ratio) + c(-1, 1) * qnorm(0.975) * se_log_lr
     )
 
-    c(
-        `Patients assessed, n` = as.character(assessed),
-        `Patients meeting the criterion, n (%)` = sprintf(
-            "%d (%.0f)", cases, 100 * cases / assessed
+    list(
+        table = c(
+            `Patients assessed, n` = as.character(assessed),
+            `Patients meeting the criterion, n (%)` = sprintf(
+                "%d (%.0f)", cases, 100 * cases / assessed
+            ),
+            `AUC of prealbumin (95% CI)` = format_estimate_ci(
+                as.numeric(auc(roc_fit)), auc_interval[c(1, 3)]
+            ),
+            `Prealbumin < 0.20 g/L` = "",
+            `  True positives / false positives` = sprintf(
+                "%d / %d", true_positive, false_positive
+            ),
+            `  False negatives / true negatives` = sprintf(
+                "%d / %d", false_negative, true_negative
+            ),
+            `  Sensitivity (95% CI)` = format_estimate_ci(
+                sensitivity,
+                wilson_ci(true_positive, true_positive + false_negative)
+            ),
+            `  Specificity (95% CI)` = format_estimate_ci(
+                specificity,
+                wilson_ci(true_negative, true_negative + false_positive)
+            ),
+            `  Positive predictive value (95% CI)` = format_estimate_ci(
+                positive_predictive_value,
+                wilson_ci(true_positive, true_positive + false_positive)
+            ),
+            `  Negative predictive value (95% CI)` = format_estimate_ci(
+                negative_predictive_value,
+                wilson_ci(true_negative, true_negative + false_negative)
+            ),
+            `  Positive likelihood ratio (95% CI)` = format_estimate_ci(
+                positive_likelihood_ratio, lr_interval
+            ),
+            `  Maximum Youden index across all cut-offs` = sprintf(
+                "%.2f", maximum_youden(roc_fit)
+            )
         ),
-        `AUC of prealbumin (95% CI)` = format_estimate_ci(
-            as.numeric(auc(roc_fit)), auc_interval[c(1, 3)]
-        ),
-        `Prealbumin < 0.20 g/L` = "",
-        `  True positives / false positives` = sprintf(
-            "%d / %d", true_positive, false_positive
-        ),
-        `  False negatives / true negatives` = sprintf(
-            "%d / %d", false_negative, true_negative
-        ),
-        `  Sensitivity (95% CI)` = format_estimate_ci(
-            sensitivity,
-            wilson_ci(true_positive, true_positive + false_negative)
-        ),
-        `  Specificity (95% CI)` = format_estimate_ci(
-            specificity,
-            wilson_ci(true_negative, true_negative + false_positive)
-        ),
-        `  Positive predictive value (95% CI)` = format_estimate_ci(
-            positive_predictive_value,
-            wilson_ci(true_positive, true_positive + false_positive)
-        ),
-        `  Negative predictive value (95% CI)` = format_estimate_ci(
-            negative_predictive_value,
-            wilson_ci(true_negative, true_negative + false_negative)
-        ),
-        `  Positive likelihood ratio (95% CI)` = format_estimate_ci(
-            positive_likelihood_ratio, lr_interval
-        ),
-        `  Maximum Youden index across all cut-offs` = sprintf(
-            "%.2f", maximum_youden(roc_fit)
+        roc_fit = roc_fit,
+        auc = as.numeric(auc(roc_fit)),
+        auc_interval = unname(auc_interval[c(1, 3)]),
+        assessed = assessed,
+        cases = cases,
+        threshold_point = c(
+            false_positive_rate = 1 - specificity,
+            sensitivity = sensitivity
         )
     )
 }
@@ -152,13 +163,100 @@ analyse_assessment <- function(
 # A fixed seed makes the bootstrap confidence intervals reproducible.
 set.seed(424242)
 
-table3_panel_a <- map(time_levels, analyse_assessment,
-                      auc_ci_method = "bootstrap") |>
+assessment_results <- map(
+    time_levels,
+    analyse_assessment,
+    auc_ci_method = "bootstrap"
+)
+
+table3_panel_a <- map(assessment_results, "table") |>
     as.data.frame(check.names = FALSE) |>
     tibble::rownames_to_column("Characteristic")
 
 # Display Table 3, panel A
 kable(table3_panel_a, align = c("l", "c", "c", "c"), row.names = FALSE)
+
+# ╭───────────────────────────────────────────────────────────────────────────╮
+# │ Figure 1: ROC curves for excessive lean-mass loss                         │
+# ╰───────────────────────────────────────────────────────────────────────────╯
+
+draw_figure1 <- function() {
+    old_par <- par(
+        mfrow = c(1, 3),
+        mar = c(4.2, 4.2, 3.0, 1.0),
+        oma = c(0, 0, 0, 0),
+        mgp = c(2.4, 0.7, 0),
+        tcl = -0.3
+    )
+    on.exit(par(old_par))
+
+    panel_titles <- names(time_levels)
+
+    walk2(assessment_results, seq_along(assessment_results), \(result, i) {
+        false_positive_rate <- 1 - result$roc_fit$specificities
+        sensitivity <- result$roc_fit$sensitivities
+        curve_order <- order(false_positive_rate, sensitivity)
+
+        plot(
+            NA,
+            xlim = c(0, 1), ylim = c(0, 1), asp = 1,
+            xaxs = "i", yaxs = "i",
+            xlab = "1 - specificity",
+            ylab = if (i == 1) "Sensitivity" else "",
+            axes = FALSE
+        )
+        axis(1, at = seq(0, 1, 0.25), las = 1)
+        axis(2, at = seq(0, 1, 0.25), las = 1)
+        box()
+        abline(a = 0, b = 1, col = "grey60", lty = 2, lwd = 1.5)
+        lines(
+            false_positive_rate[curve_order],
+            sensitivity[curve_order],
+            type = "s", lwd = 2.5, col = "#163A5F"
+        )
+
+        threshold <- result$threshold_point
+        points(
+            threshold["false_positive_rate"], threshold["sensitivity"],
+            pch = 21, cex = 1.35, lwd = 2,
+            bg = "white", col = "#B44C43"
+        )
+        text(
+            threshold["false_positive_rate"],
+            threshold["sensitivity"],
+            labels = "0.20 g/L", pos = 3, offset = 0.7, cex = 0.9
+        )
+
+        title(
+            main = paste0(LETTERS[i], "   ", panel_titles[i]),
+            adj = 0, font.main = 2
+        )
+        text(
+            0.97, 0.04,
+            labels = sprintf(
+                "AUC %.2f (%.2f to %.2f)\nn = %d, %d cases",
+                result$auc,
+                result$auc_interval[1], result$auc_interval[2],
+                result$assessed, result$cases
+            ),
+            adj = c(1, 0), cex = 0.85
+        )
+    })
+}
+
+png(
+    file.path(output_dir, "figure1.png"),
+    width = 2400, height = 850, res = 200, pointsize = 12
+)
+draw_figure1()
+dev.off()
+
+pdf(
+    file.path(output_dir, "figure1.pdf"),
+    width = 12, height = 4.25, pointsize = 11, useDingbats = FALSE
+)
+draw_figure1()
+dev.off()
 
 # ╭───────────────────────────────────────────────────────────────────────────╮
 # │    Table 3, Panel B:  Association with the preoperative lean mass lost    │
