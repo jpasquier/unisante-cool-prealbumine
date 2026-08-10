@@ -28,3 +28,8 @@ The resulting intervals are therefore slightly wider.
 Confidence intervals are calculated using the t distribution, and the
 time-since-surgery categories are defined strictly according to their stated
 boundaries.
+
+## Figure S1/S2
+
+Figure S2 is called Figure S1. This is consistent with the reference made to
+this figure in the caption of Table 3.

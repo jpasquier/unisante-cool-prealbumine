@@ -21,7 +21,8 @@ ARTICLE_V2_SCRIPTS := \
 	code/article_v2/table3.R \
 	code/article_v2/table4.R \
 	code/article_v2/table5.R \
-	code/article_v2/figure2.R
+	code/article_v2/figure2.R \
+	code/article_v2/figureS1.R
 
 PREPROCESS_SCRIPT_1 := code/exploratory/data_preprocessing.R
 
