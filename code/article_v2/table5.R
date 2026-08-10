@@ -157,8 +157,7 @@ analyse_almi_stratum <- function(group_label, in_group) {
         digits = 2,
         covariates = c("Gender", "age"),
         data = d
-    ) |>
-        select(-`Excludes |r| = 0.30`)
+    )
 }
 
 table5_panel_b <- imap_dfr(
@@ -174,8 +173,8 @@ kable(
 )
 
 # ╭───────────────────────────────────────────────────────────────────────────╮
-# │ Table 5, Panel C: Body composition by clinical prealbumin threshold  │
-# ╰────────────────────────────────────────────────────────────────────────────╯
+# │    Table 5, Panel C: Body composition by clinical prealbumin threshold    │
+# ╰───────────────────────────────────────────────────────────────────────────╯
 
 format_mean_sd <- function(x, digits) {
     sprintf(
@@ -229,6 +228,46 @@ write_xlsx(
     ),
     file.path(output_dir, "table5.xlsx")
 )
+
+# Caption
+c(
+    "Panel A examines the association between prealbumin concentration and six
+    body-composition outcomes in the complete cross-sectional cohort. For each
+    outcome, Model 1 is adjusted for sex, and Model 2 is additionally adjusted
+    for age and time since surgery. Regression coefficients are expressed as
+    the expected difference in the outcome per 0.05 g/L lower prealbumin
+    concentration. Partial correlations describe the association in the
+    natural prealbumin direction and are adjusted for the same covariates;
+    consequently, their signs are opposite to those of the regression
+    coefficients. The last column indicates whether the 95% confidence
+    interval of the partial correlation lies entirely within −0.30 to +0.30,
+    thereby excluding an association of at least 0.30 in absolute value.",
+    "Panel B examines the association between prealbumin and ALMI separately
+    among participants assessed 3 to <5 years, 5 to <10 years, and at least 10
+    years after surgery. Within each stratum, the linear regression and partial
+    correlation are adjusted for sex and age. Regression coefficients are
+    expressed per 0.05 g/L lower prealbumin, whereas partial correlations use
+    the natural prealbumin direction. The follow-up intervals are defined as
+    half-open categories, so a participant assessed exactly five years after
+    surgery is included in the 5 to <10 years stratum.",
+    "Panel C compares body composition between participants with prealbumin
+    <0.20 g/L and those with prealbumin ≥0.20 g/L. Values in the first two
+    columns are unadjusted mean (SD). Adjusted differences are estimated using
+    linear regression controlling for sex, age, and time since surgery, and
+    are calculated as the adjusted mean in the <0.20 g/L group minus that in
+    the ≥0.20 g/L group.",
+    "For all regression coefficients and adjusted differences, 95% confidence
+    intervals are based on the t distribution, and P values are from the
+    corresponding two-sided t tests. Confidence intervals for partial
+    correlations are based on Fisher's z transformation.",
+    "ALM, appendicular lean mass; ALMI, appendicular lean mass index; CI,
+    confidence interval; FMI, fat mass index; LMI, lean mass index; SD,
+    standard deviation."
+) |>
+    lapply(\(p) paste(strwrap(p), collapse = " ")) |>
+    paste(collapse = "\n\n") |>
+    cat(file = here(output_dir, "table5_caption.txt"))
+
 
 # Session information
 sink(file.path(output_dir, "table5_sessionInfo.txt"))
