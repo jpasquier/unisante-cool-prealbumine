@@ -271,6 +271,30 @@ map_dfr(assessment_results, \(result) {
         row.names = FALSE
     )
 
+# Figure 1 caption
+c(
+    "Figure 1. Receiver operating characteristic curves for serum prealbumin to
+    identify excessive postoperative lean-mass loss at 6 months (A), 1 year
+    (B), and 3 years (C) after Roux-en-Y gastric bypass. Excessive lean-mass
+    loss was defined as lean mass accounting for more than 25% of the body
+    weight lost since surgery, based on dual-energy X-ray absorptiometry at the
+    corresponding assessment. Prealbumin was oriented a priori so that lower
+    concentrations represented greater predicted risk.",
+    "Solid lines show the receiver operating characteristic curves, and the
+    dashed diagonal line indicates no discrimination. Open circles indicate the
+    sensitivity and false-positive rate obtained with the clinical threshold of
+    prealbumin <0.20 g/L. Each panel reports the area under the curve with its
+    stratified-bootstrap 95% confidence interval based on 10,000 replicates,
+    together with the number of participants assessed and the number meeting
+    the excessive-loss criterion. An area under the curve below 0.50 indicates
+    discrimination in the direction opposite to the prespecified hypothesis.",
+    "AUC, area under the receiver operating characteristic curve; CI,
+    confidence interval."
+) |>
+    lapply(\(p) paste(strwrap(p), collapse = " ")) |>
+    paste(collapse = "\n\n") |>
+    cat(file = file.path(output_dir, "figure1_caption.txt"))
+
 # ╭───────────────────────────────────────────────────────────────────────────╮
 # │    Table 3, Panel B:  Association with the preoperative lean mass lost    │
 # ╰───────────────────────────────────────────────────────────────────────────╯
